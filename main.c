@@ -39,6 +39,9 @@ typdef enum state {
     READING
 } state;
 
+#define WIDTH 128
+#define HEIGHT 64
+
 
 
 #define I2C_TX_MAX_PACKET_SIZE (16)
@@ -100,18 +103,20 @@ int main(void)
 
 
 void read_routine(void) {
+    gTxPacket = {0x03, 0, 0};
+    write("sensor");
     read();
     display();
 }
 
 
 void calibrate(void) {
-    gTxPacket = {0x26, 0xF, 0x0, 0x0};
+    gTxPacket = {0b0101100, 0x26, 0x00};
     write("sensor");
 }
 
 void display(void) {
-    
+
     // 128 x 64
 
     if ((!buffer) && !(buffer = (uint8_t *)malloc(WIDTH * ((HEIGHT + 7) / 8))))
@@ -135,7 +140,23 @@ void display(void) {
     }
 
 
-    gTxPacket = {0x40, 0x40, 0x40, (uint16 *)buffer}
+    uint16_t count = WIDTH * ((HEIGHT + 7) / 8);
+    uint8_t *ptr = buffer;
+    uint8_t index = 0;
+    uint8_t packetSize = 0;
+
+    while(count--) {
+        if(packetSize == I2C_TX_MAX_PACKET_SIZE) {
+            write("display");
+            gTxPacket = {0x0, 0x0, 0x0};
+        }
+        if(gTxPacket[0] != 0x40) {
+            gTxPacket[0] = 0x40;
+        }
+        gTxPacket[index] = *ptr++;
+        index++;
+        packetSize++;
+    }
     write("display");
 
 }
@@ -202,13 +223,13 @@ void write(char []target) {
 }
 
 void read() {
-    target = b0111100;
+    I2C_TARGET_ADDRESS = b0111100;
     /* Send a read request to Target */
     gRxLen               = I2C_RX_PACKET_SIZE;
     gRxCount             = 0;
     gI2cControllerStatus = I2C_STATUS_RX_STARTED;
     DL_I2C_startControllerTransfer(
-        I2C_INST, target, DL_I2C_CONTROLLER_DIRECTION_RX, gRxLen);
+        I2C_INST, I2C_TARGET_ADDRESS, DL_I2C_CONTROLLER_DIRECTION_RX, gRxLen);
 
     /* Wait for all bytes to be received in interrupt */
     while (gI2cControllerStatus != I2C_STATUS_RX_COMPLETE) {
