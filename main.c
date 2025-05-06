@@ -122,33 +122,36 @@ void display(void) {
     if ((!buffer) && !(buffer = (uint8_t *)malloc(WIDTH * ((HEIGHT + 7) / 8))))
       exit(1);
 
-    bits = turnIntoBits(gRxPacket)
-
     uint8_t *pBuf = &buffer[(y / 8) * WIDTH + x], mask = 1 << (y & 7);
 
-    for bit in bits {
-        if(bit==1) {
-            while (w--) {
-                *pBuf++ |= mask;
-            };
-        } else {
-            mask = ~mask;
-            while (w--) {
-              *pBuf++ &= mask;
-            };
+    for (size_t i = 0; i < 8*I2C_RX_MAX_PACKET_SIZE; i++) {
+            for (int bit = 7; bit >= 0; bit--) {
+                uint8_t bit_value = (gRxPacket[i] >> bit) & 1;
+                if(bit==1) {
+                    while (w--) {
+                        *pBuf++ |= mask;
+                    };
+                } else {
+                    mask = ~mask;
+                    while (w--) {
+                      *pBuf++ &= mask;
+                    };
+                }
+            }
         }
-    }
 
 
     uint16_t count = WIDTH * ((HEIGHT + 7) / 8);
     uint8_t *ptr = buffer;
-    uint8_t index = 0;
-    uint8_t packetSize = 0;
+    uint8_t index = 1;
+    uint8_t packetSize = 1;
 
     while(count--) {
         if(packetSize == I2C_TX_MAX_PACKET_SIZE) {
             write("display");
             gTxPacket = {0x0, 0x0, 0x0};
+            index = 1;
+            packetSize = 1;
         }
         if(gTxPacket[0] != 0x40) {
             gTxPacket[0] = 0x40;
